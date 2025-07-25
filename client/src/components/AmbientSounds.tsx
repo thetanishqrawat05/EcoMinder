@@ -1,33 +1,39 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Volume2, VolumeX, Crown } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Volume2, VolumeX, Crown, Play, Pause } from 'lucide-react';
 
 export default function AmbientSounds() {
   const [selectedSound, setSelectedSound] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState([0.5]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const sounds = [
     {
       id: 'rain',
       name: 'Rain',
-      image: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=120',
       icon: '🌧️',
       free: true,
+      // Using a free rain sound URL
+      url: 'https://www.soundjay.com/misc/sounds/rain-01.wav',
+      // Fallback to a web audio API generated rain sound
+      generateAudio: () => generateRainSound(),
     },
     {
       id: 'ocean',
       name: 'Ocean',
-      image: 'https://images.unsplash.com/photo-1505142468610-359e7d316be0?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=120',
       icon: '🌊',
       free: true,
+      generateAudio: () => generateOceanSound(),
     },
     {
       id: 'forest',
       name: 'Forest',
-      image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=120',
       icon: '🌲',
       free: true,
+      generateAudio: () => generateForestSound(),
     },
     {
       id: 'cafe',
@@ -49,20 +55,114 @@ export default function AmbientSounds() {
     },
   ];
 
+  // Audio generation functions
+  const generateRainSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const bufferSize = audioContext.sampleRate * 2; // 2 seconds of audio
+    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    // Generate white noise for rain effect
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.3;
+    }
+    
+    return { audioContext, buffer };
+  };
+
+  const generateOceanSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const bufferSize = audioContext.sampleRate * 4; // 4 seconds of audio
+    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    // Generate wave-like sound
+    for (let i = 0; i < bufferSize; i++) {
+      const t = i / audioContext.sampleRate;
+      data[i] = Math.sin(2 * Math.PI * 0.5 * t) * 0.2 + 
+                (Math.random() * 2 - 1) * 0.1;
+    }
+    
+    return { audioContext, buffer };
+  };
+
+  const generateForestSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const bufferSize = audioContext.sampleRate * 3; // 3 seconds of audio
+    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    // Generate subtle wind and rustling sounds
+    for (let i = 0; i < bufferSize; i++) {
+      const t = i / audioContext.sampleRate;
+      data[i] = Math.sin(2 * Math.PI * 0.2 * t) * 0.1 + 
+                (Math.random() * 2 - 1) * 0.05;
+    }
+    
+    return { audioContext, buffer };
+  };
+
+  const playGeneratedSound = (soundId: string) => {
+    const sound = sounds.find(s => s.id === soundId);
+    if (!sound?.generateAudio) return;
+
+    try {
+      const { audioContext, buffer } = sound.generateAudio();
+      const source = audioContext.createBufferSource();
+      const gainNode = audioContext.createGain();
+      
+      source.buffer = buffer;
+      source.loop = true;
+      gainNode.gain.value = volume[0];
+      
+      source.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      source.start();
+      
+      // Store reference to stop later
+      audioRef.current = source as any;
+      
+    } catch (error) {
+      console.error('Error playing generated sound:', error);
+    }
+  };
+
+  const stopSound = () => {
+    if (audioRef.current) {
+      try {
+        if ('stop' in audioRef.current) {
+          (audioRef.current as any).stop();
+        }
+        audioRef.current = null;
+      } catch (error) {
+        console.error('Error stopping sound:', error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (audioRef.current && 'context' in audioRef.current) {
+      const gainNode = (audioRef.current as any).context.createGain();
+      gainNode.gain.value = volume[0];
+    }
+  }, [volume]);
+
   const handleSoundSelect = (soundId: string, isPremium?: boolean) => {
     if (isPremium) {
-      // Redirect to subscription page
       window.location.href = '/subscribe';
       return;
     }
 
     if (selectedSound === soundId && isPlaying) {
+      stopSound();
       setIsPlaying(false);
       setSelectedSound(null);
     } else {
+      stopSound(); // Stop any currently playing sound
       setSelectedSound(soundId);
       setIsPlaying(true);
-      // In a real implementation, this would play the actual sound
+      playGeneratedSound(soundId);
       console.log(`Playing ${soundId} sound`);
     }
   };
@@ -87,30 +187,16 @@ export default function AmbientSounds() {
                     : 'hover:scale-105 hover:shadow-md'
                 }`}
               >
-                {sound.image ? (
-                  <>
-                    <img
-                      src={sound.image}
-                      alt={sound.name}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-2xl">{sound.icon}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className={`w-full h-full flex flex-col items-center justify-center ${
-                    sound.premium 
-                      ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' 
-                      : 'bg-gray-100 dark:bg-gray-800'
-                  }`}>
-                    <span className="text-2xl mb-1">{sound.icon}</span>
-                    {sound.premium && (
-                      <Crown className="w-3 h-3 text-white" />
-                    )}
-                  </div>
-                )}
+                <div className={`w-full h-full flex flex-col items-center justify-center ${
+                  sound.premium 
+                    ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' 
+                    : 'bg-gray-100 dark:bg-gray-800'
+                }`}>
+                  <span className="text-2xl mb-1">{sound.icon}</span>
+                  {sound.premium && (
+                    <Crown className="w-3 h-3 text-white" />
+                  )}
+                </div>
                 
                 <div className="absolute bottom-1 left-1 text-white text-xs font-medium bg-black/50 px-1 rounded">
                   {sound.name}
@@ -146,6 +232,7 @@ export default function AmbientSounds() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
+                  stopSound();
                   setIsPlaying(false);
                   setSelectedSound(null);
                 }}
