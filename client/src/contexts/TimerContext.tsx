@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequestLegacy } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 export interface TimerState {
@@ -43,7 +43,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   const createSessionMutation = useMutation({
     mutationFn: async (data: { type: string; duration: number; ambientSound?: string }) => {
-      const response = await apiRequest('POST', '/api/timer/session', data);
+      const response = await apiRequestLegacy('POST', '/api/timer/session', data);
       return response.json();
     },
     onSuccess: (session) => {
@@ -53,7 +53,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   const updateSessionMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
-      const response = await apiRequest('PATCH', `/api/timer/session/${id}`, updates);
+      const response = await apiRequestLegacy('PATCH', `/api/timer/session/${id}`, updates);
       return response.json();
     },
     onSuccess: () => {
@@ -198,4 +198,35 @@ export function useTimer() {
     throw new Error('useTimer must be used within a TimerProvider');
   }
   return context;
+}
+
+// Additional interface for premium components
+export interface EnhancedTimerContextType extends TimerContextType {
+  toggleTimer: () => void;
+  timeRemaining: number;
+  isRunning: boolean;
+  currentSessionType: string;
+  currentSessionId: string | null;
+}
+
+// Enhanced hook with additional utilities for premium components
+export function useTimerContext(): EnhancedTimerContextType {
+  const context = useTimer();
+  
+  const toggleTimer = useCallback(() => {
+    if (context.timerState.isRunning) {
+      context.pauseTimer();
+    } else {
+      context.resumeTimer();
+    }
+  }, [context]);
+
+  return {
+    ...context,
+    toggleTimer,
+    timeRemaining: context.timerState.timeRemaining,
+    isRunning: context.timerState.isRunning,
+    currentSessionType: context.timerState.type,
+    currentSessionId: context.timerState.sessionId,
+  };
 }

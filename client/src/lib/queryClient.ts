@@ -7,7 +7,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(
+export async function apiRequestLegacy(
   method: string,
   url: string,
   data?: unknown | undefined,
@@ -47,11 +47,38 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      staleTime: 2 * 60 * 1000, // 2 minutes for better performance
+      gcTime: 10 * 60 * 1000, // 10 minutes cache
+      retry: (failureCount, error) => {
+        // Don't retry on auth errors
+        if (error instanceof Error && error.message.includes('401')) return false;
+        return failureCount < 2;
+      },
     },
     mutations: {
-      retry: false,
+      retry: 1,
     },
   },
 });
+
+// Optimized API request for new premium components
+export async function apiRequest(url: string, options?: RequestInit): Promise<any> {
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error('PREMIUM_REQUIRED');
+    }
+    const errorText = await response.text();
+    throw new Error(`${response.status}: ${errorText}`);
+  }
+
+  return response.json();
+}

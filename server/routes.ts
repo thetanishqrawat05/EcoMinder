@@ -276,6 +276,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Premium feature access middleware
+  const requirePremiumAccess = async (req: any, res: any, next: any) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const hasAccess = await storage.canAccessPremiumFeatures(userId);
+      if (!hasAccess) {
+        return res.status(403).json({ 
+          message: "Premium feature access required. Free trial has expired.",
+          code: "PREMIUM_REQUIRED"
+        });
+      }
+      
+      next();
+    } catch (error) {
+      console.error("Premium access check error:", error);
+      res.status(500).json({ message: "Failed to verify premium access" });
+    }
+  };
+
+  // Premium features status check
+  app.get('/api/premium/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const hasAccess = await storage.canAccessPremiumFeatures(userId);
+      
+      const accountAge = Date.now() - new Date(user.createdAt).getTime();
+      const oneWeekInMs = 7 * 24 * 60 * 60 * 1000;
+      const trialDaysRemaining = Math.max(0, Math.ceil((oneWeekInMs - accountAge) / (24 * 60 * 60 * 1000)));
+      
+      res.json({
+        isPremium: user.isPremium,
+        hasAccess,
+        trialDaysRemaining,
+        accountAge: Math.floor(accountAge / (24 * 60 * 60 * 1000))
+      });
+    } catch (error) {
+      console.error("Error checking premium status:", error);
+      res.status(500).json({ message: "Failed to check premium status" });
+    }
+  });
+
+  // Task management routes
+  app.post('/api/tasks', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const task = await storage.createTask({ ...req.body, userId });
+      res.json(task);
+    } catch (error) {
+      console.error("Error creating task:", error);
+      res.status(400).json({ message: "Failed to create task" });
+    }
+  });
+
+  app.get('/api/tasks', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const tasks = await storage.getUserTasks(userId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+
+  app.patch('/api/tasks/:id', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const task = await storage.updateTask(id, req.body);
+      res.json(task);
+    } catch (error) {
+      console.error("Error updating task:", error);
+      res.status(400).json({ message: "Failed to update task" });
+    }
+  });
+
+  app.delete('/api/tasks/:id', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteTask(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      res.status(400).json({ message: "Failed to delete task" });
+    }
+  });
+
+  // Gamification routes
+  app.get('/api/game/profile', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const gameData = await storage.getUserGameData(userId);
+      const achievements = await storage.getAchievements();
+      res.json({ gameData, achievements });
+    } catch (error) {
+      console.error("Error fetching game profile:", error);
+      res.status(500).json({ message: "Failed to fetch game profile" });
+    }
+  });
+
+  app.post('/api/game/xp', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { xp } = req.body;
+      const gameData = await storage.updateUserXP(userId, xp);
+      res.json(gameData);
+    } catch (error) {
+      console.error("Error updating XP:", error);
+      res.status(400).json({ message: "Failed to update XP" });
+    }
+  });
+
+  // AI Chat routes
+  app.post('/api/ai/chat', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { message, context, sessionId } = req.body;
+      
+      // Save user message
+      await storage.saveChatMessage({
+        userId,
+        sessionId,
+        message,
+        isUserMessage: true,
+        context,
+      });
+
+      // Generate AI response (placeholder for now - will implement OpenAI when API key is provided)
+      let aiResponse = "I understand you're having trouble staying focused. Here are some suggestions: Try the 25-minute Pomodoro technique, eliminate distractions by turning off notifications, and break large tasks into smaller ones.";
+      
+      if (context === 'pause') {
+        aiResponse = "Taking breaks is normal! Remember why you started this session. Try taking 3 deep breaths and getting back to your task. You've got this! 💪";
+      } else if (context === 'fail') {
+        aiResponse = "Don't worry about incomplete sessions - they're part of the learning process. Consider trying shorter 15-minute sessions next time, or identifying what distracted you.";
+      }
+
+      // Save AI response
+      const chatMessage = await storage.saveChatMessage({
+        userId,
+        sessionId,
+        message,
+        isUserMessage: false,
+        aiResponse,
+        context,
+      });
+
+      res.json({ response: aiResponse, chatMessage });
+    } catch (error) {
+      console.error("Error processing AI chat:", error);
+      res.status(500).json({ message: "Failed to process chat message" });
+    }
+  });
+
+  app.get('/api/ai/history', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const history = await storage.getChatHistory(userId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching chat history:", error);
+      res.status(500).json({ message: "Failed to fetch chat history" });
+    }
+  });
+
+  // Screen usage tracking routes
+  app.post('/api/screen-usage', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const log = await storage.saveScreenUsageLog({ ...req.body, userId });
+      res.json(log);
+    } catch (error) {
+      console.error("Error saving screen usage:", error);
+      res.status(400).json({ message: "Failed to save screen usage data" });
+    }
+  });
+
+  app.get('/api/screen-usage/stats', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { sessionId } = req.query;
+      const stats = await storage.getScreenUsageStats(userId, sessionId as string);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching screen usage stats:", error);
+      res.status(500).json({ message: "Failed to fetch screen usage stats" });
+    }
+  });
+
+  // Community challenges routes
+  app.get('/api/challenges', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const challenges = await storage.getActiveChallenges();
+      res.json(challenges);
+    } catch (error) {
+      console.error("Error fetching challenges:", error);
+      res.status(500).json({ message: "Failed to fetch challenges" });
+    }
+  });
+
+  app.get('/api/challenges/progress', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const progress = await storage.getUserChallengeProgress(userId);
+      res.json(progress);
+    } catch (error) {
+      console.error("Error fetching challenge progress:", error);
+      res.status(500).json({ message: "Failed to fetch challenge progress" });
+    }
+  });
+
+  app.post('/api/challenges/:id/join', isAuthenticated, requirePremiumAccess, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: challengeId } = req.params;
+      const progress = await storage.updateChallengeProgress(userId, challengeId, 0);
+      res.json(progress);
+    } catch (error) {
+      console.error("Error joining challenge:", error);
+      res.status(400).json({ message: "Failed to join challenge" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

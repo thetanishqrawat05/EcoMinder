@@ -4,6 +4,13 @@ import {
   userSettings,
   dailyStreaks,
   motivationalQuotes,
+  tasks,
+  userGameData,
+  achievements,
+  communityChallenge,
+  userChallengeProgress,
+  aiChatHistory,
+  screenUsageLogs,
   type User,
   type UpsertUser,
   type TimerSession,
@@ -13,6 +20,11 @@ import {
   type DailyStreak,
   type InsertDailyStreak,
   type MotivationalQuote,
+  insertTaskSchema,
+  insertUserGameDataSchema,
+  insertAiChatHistorySchema,
+  insertScreenUsageLogSchema,
+  insertUserChallengeProgressSchema,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -40,6 +52,34 @@ export interface IStorage {
   
   // Motivational quotes
   getRandomQuote(): Promise<MotivationalQuote | undefined>;
+  
+  // Premium feature access check
+  canAccessPremiumFeatures(userId: string): Promise<boolean>;
+  
+  // Tasks operations
+  createTask(task: any): Promise<any>;
+  getUserTasks(userId: string): Promise<any[]>;
+  updateTask(id: string, updates: any): Promise<any>;
+  deleteTask(id: string): Promise<void>;
+  
+  // Gamification operations
+  getUserGameData(userId: string): Promise<any>;
+  upsertUserGameData(data: any): Promise<any>;
+  getAchievements(): Promise<any[]>;
+  updateUserXP(userId: string, xpToAdd: number): Promise<any>;
+  
+  // AI Chat operations
+  saveChatMessage(message: any): Promise<any>;
+  getChatHistory(userId: string, limit?: number): Promise<any[]>;
+  
+  // Screen usage tracking
+  saveScreenUsageLog(log: any): Promise<any>;
+  getScreenUsageStats(userId: string, sessionId?: string): Promise<any>;
+  
+  // Community challenges
+  getActiveChallenges(): Promise<any[]>;
+  getUserChallengeProgress(userId: string): Promise<any[]>;
+  updateChallengeProgress(userId: string, challengeId: string, sessions: number): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -201,6 +241,163 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`RANDOM()`)
       .limit(1);
     return quote;
+  }
+
+  // Premium feature access check - free for one week from account creation
+  async canAccessPremiumFeatures(userId: string): Promise<boolean> {
+    const user = await this.getUser(userId);
+    if (!user) return false;
+    
+    // Check if user has premium subscription
+    if (user.isPremium) return true;
+    
+    // Check if user is within free trial period (7 days from account creation)
+    const createdAt = user.createdAt ? new Date(user.createdAt) : new Date();
+    const accountAge = Date.now() - createdAt.getTime();
+    const oneWeekInMs = 7 * 24 * 60 * 60 * 1000;
+    return accountAge <= oneWeekInMs;
+  }
+
+  // Tasks operations
+  async createTask(task: any): Promise<any> {
+    const [newTask] = await db.insert(tasks).values(task).returning();
+    return newTask;
+  }
+
+  async getUserTasks(userId: string): Promise<any[]> {
+    return await db.select().from(tasks).where(eq(tasks.userId, userId)).orderBy(desc(tasks.createdAt));
+  }
+
+  async updateTask(id: string, updates: any): Promise<any> {
+    const [updatedTask] = await db.update(tasks).set({ ...updates, updatedAt: new Date() }).where(eq(tasks.id, id)).returning();
+    return updatedTask;
+  }
+
+  async deleteTask(id: string): Promise<void> {
+    await db.delete(tasks).where(eq(tasks.id, id));
+  }
+
+  // Gamification operations
+  async getUserGameData(userId: string): Promise<any> {
+    const [gameData] = await db.select().from(userGameData).where(eq(userGameData.userId, userId));
+    if (!gameData) {
+      // Create initial game data for new user
+      const [newGameData] = await db.insert(userGameData).values({ userId }).returning();
+      return newGameData;
+    }
+    return gameData;
+  }
+
+  async upsertUserGameData(data: any): Promise<any> {
+    const [gameData] = await db.insert(userGameData).values(data).onConflictDoUpdate({
+      target: userGameData.userId,
+      set: { ...data, updatedAt: new Date() }
+    }).returning();
+    return gameData;
+  }
+
+  async getAchievements(): Promise<any[]> {
+    return await db.select().from(achievements).where(eq(achievements.isActive, true)).orderBy(achievements.category);
+  }
+
+  async updateUserXP(userId: string, xpToAdd: number): Promise<any> {
+    const gameData = await this.getUserGameData(userId);
+    const newTotalXp = gameData.totalXp + xpToAdd;
+    
+    // Calculate level progression (every 100 XP = level up)
+    const newLevel = Math.floor(newTotalXp / 100) + 1;
+    const xpToNextLevel = ((newLevel) * 100) - newTotalXp;
+    
+    return await this.upsertUserGameData({
+      userId,
+      totalXp: newTotalXp,
+      currentLevel: newLevel,
+      xpToNextLevel,
+      completedAchievements: gameData.completedAchievements
+    });
+  }
+
+  // AI Chat operations
+  async saveChatMessage(message: any): Promise<any> {
+    const [chatMessage] = await db.insert(aiChatHistory).values(message).returning();
+    return chatMessage;
+  }
+
+  async getChatHistory(userId: string, limit: number = 50): Promise<any[]> {
+    return await db.select().from(aiChatHistory)
+      .where(eq(aiChatHistory.userId, userId))
+      .orderBy(desc(aiChatHistory.createdAt))
+      .limit(limit);
+  }
+
+  // Screen usage tracking
+  async saveScreenUsageLog(log: any): Promise<any> {
+    const [usageLog] = await db.insert(screenUsageLogs).values(log).returning();
+    return usageLog;
+  }
+
+  async getScreenUsageStats(userId: string, sessionId?: string): Promise<any> {
+    let conditions = [eq(screenUsageLogs.userId, userId)];
+    
+    if (sessionId) {
+      conditions.push(eq(screenUsageLogs.sessionId, sessionId));
+    }
+    
+    const logs = await db.select()
+      .from(screenUsageLogs)
+      .where(and(...conditions))
+      .orderBy(desc(screenUsageLogs.createdAt))
+      .limit(10);
+    
+    const totalDistractions = logs.reduce((sum, log) => sum + (log.distractionCount || 0), 0);
+    const totalFocusTime = logs.reduce((sum, log) => sum + (log.focusTime || 0), 0);
+    const totalAwayTime = logs.reduce((sum, log) => sum + (log.awayTime || 0), 0);
+    
+    return {
+      logs,
+      totalDistractions,
+      totalFocusTime,
+      totalAwayTime,
+      focusRatio: totalFocusTime / (totalFocusTime + totalAwayTime) || 0
+    };
+  }
+
+  // Community challenges
+  async getActiveChallenges(): Promise<any[]> {
+    const now = new Date();
+    return await db.select().from(communityChallenge)
+      .where(and(
+        eq(communityChallenge.isActive, true),
+        lte(communityChallenge.startDate, now),
+        gte(communityChallenge.endDate, now)
+      ))
+      .orderBy(communityChallenge.endDate);
+  }
+
+  async getUserChallengeProgress(userId: string): Promise<any[]> {
+    return await db.select({
+      challenge: communityChallenge,
+      progress: userChallengeProgress
+    }).from(userChallengeProgress)
+      .innerJoin(communityChallenge, eq(userChallengeProgress.challengeId, communityChallenge.id))
+      .where(eq(userChallengeProgress.userId, userId))
+      .orderBy(desc(userChallengeProgress.joinedAt));
+  }
+
+  async updateChallengeProgress(userId: string, challengeId: string, sessions: number): Promise<any> {
+    const [progress] = await db.insert(userChallengeProgress).values({
+      userId,
+      challengeId,
+      currentSessions: sessions
+    }).onConflictDoUpdate({
+      target: [userChallengeProgress.userId, userChallengeProgress.challengeId],
+      set: { 
+        currentSessions: sessions,
+        isCompleted: sql`${userChallengeProgress.currentSessions} >= (SELECT target_sessions FROM community_challenges WHERE id = ${challengeId})`
+      }
+    }).returning();
+    
+    return progress;
   }
 }
 

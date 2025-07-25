@@ -13,6 +13,7 @@ import Analytics from "@/pages/analytics";
 import History from "@/pages/history";
 import Settings from "@/pages/settings";
 import Subscribe from "@/pages/subscribe";
+import { PremiumPage } from "@/pages/premium";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -40,6 +41,7 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/history" component={History} />
+          <Route path="/premium" component={PremiumPage} />
           <Route path="/settings" component={Settings} />
           <Route path="/subscribe" component={Subscribe} />
           <Route component={NotFound} />
