@@ -1,0 +1,67 @@
+You are a professional mobile app developer. Build a complete, production-grade React Native (Expo) mobile app called **FocusZen**, a Pomodoro-based productivity timer app with subscriptions.
+
+🔧 General Requirements:
+- Use **React Native with Expo SDK 50+**
+- Follow **Material Design 3** or **modern iOS style**
+- Use **TypeScript**
+- Use **Firebase** for login (email/password), cloud sync
+- Use **RevenueCat** for handling subscriptions (monthly & yearly)
+- Local data should be stored with **AsyncStorage** or **SQLite**
+- Push notifications using **expo-notifications**
+- Use **expo-haptics** for haptic feedback after timer ends, button presses
+- Modern animations with **react-native-reanimated** and **Framer Motion**
+- Clean, responsive layout with **react-native-paper** or **tailwind-react-native-classnames**
+
+📲 Features to Include:
+1. **Onboarding screen** (with option to sign up or skip for guest use)
+2. **Home screen** with:
+   - Pomodoro timer UI: Start / Pause / Reset buttons
+   - Predefined sessions: 25/5, 50/10, 90/15
+   - Show active streak and daily goal
+   - Option to pick background ambient sound (rain, ocean, etc.)
+3. **Timer logic**:
+   - Runs in background
+   - Handles pause/resume with state persistence
+   - Fires notification and haptic on end
+4. **History screen**:
+   - Show past sessions (time spent, type, date)
+   - Graphs using **Victory Native** or **react-native-svg-charts**
+5. **Settings screen**:
+   - Switch between light and dark theme
+   - Choose haptic strength (light, medium, heavy)
+   - Enable/disable daily reminders
+6. **Premium subscription screen**:
+   - Uses **RevenueCat**
+   - Unlocks:
+     - Unlimited custom timer durations
+     - Full ambient sound library
+     - Detailed stats view
+     - Remove ads
+     - Cloud sync enabled
+7. **Ad support** (for free users only) using **expo-ads-admob**
+8. **Daily streak logic**:
+   - Increments when a full session completes
+   - Resets if no session completed that day
+   - Show motivational quote after each complete session
+9. **Notifications**:
+   - Local notification at end of timer
+   - Daily reminder to focus (optional toggle)
+
+🧪 Testing Instructions:
+- App must run on both Android and iOS
+- All features tested with Expo Go
+- Make sure subscription flow works correctly with sandbox mode
+- Ensure timer persists if user closes the app
+- Timer should not pause in background (use `TaskManager` or `expo-background-fetch` if needed)
+
+🎨 UI / Design References:
+- Use spacing, typography, and card layout like [Tide](https://apps.apple.com/us/app/tide-focus-timer-for-productivity/id1077776989) or [Fabulous](https://play.google.com/store/apps/details?id=co.thefabulous.app)
+- Buttons must be soft-rounded, large touch targets, subtle shadows
+
+🧠 Best Practices:
+- Use React Context or Zustand for global state
+- Use separate component files for screens and widgets
+- Minimal external dependencies — only popular, stable packages
+
+Final result should be a full-featured, beautiful productivity app with modern UX, subscription monetization, haptics, notifications, and Firebase sync. Code must be modular, well-commented, and optimized for Play Store deployment.
+
