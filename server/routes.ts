@@ -10,7 +10,7 @@ import { z } from "zod";
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2023-10-16",
+    apiVersion: "2025-06-30.basil",
   });
 }
 
@@ -233,9 +233,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.stripeSubscriptionId) {
         const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
         if (subscription.latest_invoice && typeof subscription.latest_invoice === 'object') {
+          const invoice = subscription.latest_invoice as Stripe.Invoice;
           return res.json({
             subscriptionId: subscription.id,
-            clientSecret: subscription.latest_invoice.payment_intent?.client_secret,
+            clientSecret: (invoice.payment_intent as Stripe.PaymentIntent)?.client_secret,
           });
         }
       }
@@ -264,9 +265,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updateUserStripeInfo(userId, customerId, subscription.id);
   
+      const invoice = subscription.latest_invoice as Stripe.Invoice;
       res.json({
         subscriptionId: subscription.id,
-        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+        clientSecret: (invoice?.payment_intent as Stripe.PaymentIntent)?.client_secret,
       });
     } catch (error: any) {
       console.error("Error creating subscription:", error);
