@@ -19,7 +19,7 @@ export function PremiumFeatureWrapper({
   const { data: premiumStatus, isLoading } = useQuery({
     queryKey: ['/api/premium/status'],
     queryFn: () => apiRequest('/api/premium/status'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 1000, // 10 seconds for instant response
   });
 
   if (isLoading) {

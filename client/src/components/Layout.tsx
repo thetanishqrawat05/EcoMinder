@@ -129,7 +129,7 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-surface dark:bg-surface border-t border-border lg:hidden p-4 backdrop-blur-sm">
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border-t-2 border-purple-300 dark:border-purple-700 lg:hidden p-4 backdrop-blur-sm shadow-lg">
         <div className="flex justify-around">
           <Button
             variant="ghost"

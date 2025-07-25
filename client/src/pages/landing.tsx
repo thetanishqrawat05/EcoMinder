@@ -197,17 +197,22 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 border-t border-purple-200/20 dark:border-gray-700/20">
+      <footer className="py-12 border-t-4 border-purple-300 dark:border-purple-600 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <div className="w-6 h-6 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
-              <Brain className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center shadow-lg">
+              <Brain className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold text-gray-900 dark:text-white">FocusZen</span>
+            <span className="text-xl font-bold text-purple-800 dark:text-purple-200">FocusZen</span>
           </div>
-          <p className="text-gray-600 dark:text-gray-300">
+          <p className="text-purple-700 dark:text-purple-300 font-medium">
             © 2025 FocusZen. Built for better focus and productivity.
           </p>
+          <div className="mt-4 flex justify-center space-x-6 text-sm text-purple-600 dark:text-purple-400">
+            <span>🎯 Boost Productivity</span>
+            <span>⚡ Stay Focused</span>
+            <span>🏆 Achieve Goals</span>
+          </div>
         </div>
       </footer>
     </div>

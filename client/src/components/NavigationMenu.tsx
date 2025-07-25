@@ -13,7 +13,7 @@ export default function NavigationMenu() {
   const { data: premiumStatus } = useQuery({
     queryKey: ['/api/premium/status'],
     queryFn: () => apiRequest('/api/premium/status'),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 1000, // 5 seconds for instant navigation
   });
 
   const isPremium = premiumStatus?.isPremium;

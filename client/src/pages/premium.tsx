@@ -24,7 +24,7 @@ export function PremiumPage() {
   const { data: premiumStatus, isLoading } = useQuery({
     queryKey: ['/api/premium/status'],
     queryFn: () => apiRequest('/api/premium/status'),
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 10 * 1000, // 10 seconds for instant response
   });
 
   const handleTaskSessionStart = (taskId: string) => {
