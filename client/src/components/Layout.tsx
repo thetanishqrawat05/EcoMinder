@@ -1,9 +1,17 @@
 import { ReactNode } from 'react';
-import { Bell, Brain } from 'lucide-react';
+import { Bell, Brain, User, Settings, LogOut, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import NavigationMenu from './NavigationMenu';
+import type { User as UserType } from '@shared/schema';
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,6 +20,8 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  
+  const typedUser = user as UserType | undefined;
 
   const handleNotificationToggle = async () => {
     if ('Notification' in window) {
@@ -56,19 +66,50 @@ export default function Layout({ children }: LayoutProps) {
                   <span className="text-lg">🌙</span>
                 )}
               </Button>
-              {user && (
-                <div className="flex items-center space-x-2">
-                  {user.profileImageUrl && (
-                    <img
-                      src={user.profileImageUrl}
-                      alt="Profile"
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  )}
-                  <span className="text-sm font-medium hidden sm:inline text-foreground">
-                    {user.firstName || user.email}
-                  </span>
-                </div>
+              {typedUser && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center space-x-2 h-auto p-2">
+                      {typedUser.profileImageUrl ? (
+                        <img
+                          src={typedUser.profileImageUrl}
+                          alt="Profile"
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                          <User className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                      <span className="text-sm font-medium hidden sm:inline text-foreground">
+                        {typedUser.firstName || typedUser.email}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem className="flex flex-col items-start">
+                      <div className="font-medium">{typedUser.firstName || 'User'}</div>
+                      <div className="text-sm text-muted-foreground">{typedUser.email}</div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => window.location.href = '/subscribe'}>
+                      <Crown className="w-4 h-4 mr-2" />
+                      Upgrade to Premium
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
+                      <Settings className="w-4 h-4 mr-2" />
+                      Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => window.location.href = '/api/logout'}
+                      className="text-red-600 dark:text-red-400"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>
